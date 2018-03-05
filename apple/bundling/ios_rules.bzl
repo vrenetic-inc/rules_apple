@@ -287,6 +287,7 @@ def _ios_static_framework_impl(ctx):
   """Implementation of the _ios_static_framework Skylark rule."""
   bundle_name = bundling_support.bundle_name(ctx)
   hdr_files = ctx.files.hdrs
+  provided_umbrella_header_file = ctx.file.umbrella_hdr
   framework_files = [bundling_support.header_prefix(f) for f in hdr_files]
 
   sdk_dylibs = depset()
@@ -295,17 +296,23 @@ def _ios_static_framework_impl(ctx):
     sdk_dylibs += objc.sdk_dylib
     sdk_frameworks += objc.sdk_framework
 
-  # Create an umbrella header if the framework has any header files.
+  # Use an existing umbrella header if specified, or
+  # create an umbrella header if the framework has any header files.
   umbrella_header_name = None
-  if hdr_files:
-    umbrella_header_file = file_support.intermediate(ctx, "%{name}.umbrella.h")
-    framework_support.create_umbrella_header(
-        ctx.actions, umbrella_header_file, sorted(hdr_files))
-    umbrella_header_name = bundle_name + ".h"
+  if provided_umbrella_header_file:
+    umbrella_header_name = provided_umbrella_header_file.basename
     framework_files.append(bundling_support.contents_file(
-        ctx, umbrella_header_file, "Headers/" + umbrella_header_name))
+        ctx, provided_umbrella_header_file, "Headers/" + umbrella_header_name))
   else:
-    umbrella_header_name = None
+    if hdr_files:
+        umbrella_header_file = file_support.intermediate(ctx, "%{name}.umbrella.h")
+        framework_support.create_umbrella_header(
+            ctx.actions, umbrella_header_file, sorted(hdr_files))
+        umbrella_header_name = bundle_name + ".h"
+        framework_files.append(bundling_support.contents_file(
+            ctx, umbrella_header_file, "Headers/" + umbrella_header_name))
+    else:
+        umbrella_header_name = None
 
   # Create a module map if there is a need for one (that is, if there are
   # headers or if there are dylibs/frameworks that we depend on).
@@ -350,6 +357,7 @@ ios_static_framework = rule_factory.make_bundling_rule(
         "dedupe_unbundled_resources": attr.bool(default=True),
         "exclude_resources": attr.bool(default=False),
         "hdrs": attr.label_list(allow_files=[".h"]),
+        "umbrella_hdr": attr.label(allow_single_file=[".h"])
     },
     archive_extension=".zip",
     binary_providers=[apple_common.AppleStaticLibrary],

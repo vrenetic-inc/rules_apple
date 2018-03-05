@@ -304,6 +304,8 @@ def ios_static_framework(name, **kwargs):
         These headers should have framework-relative imports, and if non-empty,
         an umbrella header named `%{bundle_name}.h` will also be generated that
         imports all of the headers listed here.
+    umbrella_hdr: If the framework sources provide a pre-packaged umbrella header,
+        force the rule use the existing umbrella header instead of generating one.
     exclude_resources: Indicates whether resources should be excluded from the
         bundle. This can be used to avoid unnecessarily bundling resources if
         the static framework is being distributed in a different fashion, such
