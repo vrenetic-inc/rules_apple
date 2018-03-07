@@ -249,6 +249,8 @@ def ios_framework(name, **kwargs):
         `apple_binary` rule. Any resources, such as asset catalogs, that are
         defined by these targets will also be transitively included in the
         final framework.
+    umbrella_hdr: A name of an existing umbrella header, that, if provided,
+        enables dynamic generation of a module map for the framework.
   """
   deps = kwargs.pop("deps", [])
   apple_dylib_name = "%s.apple_binary" % name

@@ -228,14 +228,28 @@ ios_extension = rule_factory.make_bundling_rule(
 
 def _ios_framework_impl(ctx):
   """Implementation of the ios_framework Skylark rule."""
+  bundle_name = bundling_support.bundle_name(ctx)
+
   binary_artifact = binary_support.get_binary_provider(
       ctx.attr.deps, apple_common.AppleDylibBinary).binary
   bundlable_binary = bundling_support.bundlable_file(
-      binary_artifact, bundling_support.bundle_name(ctx))
+      binary_artifact, bundle_name)
   prefixed_hdr_files = []
   for hdr_provider in ctx.attr.hdrs:
     for hdr_file in hdr_provider.files:
       prefixed_hdr_files.append(bundling_support.header_prefix(hdr_file))
+  
+  modulemap_contents_file = None
+  provided_umbrella_header_file = ctx.file.umbrella_hdr
+  if provided_umbrella_header_file:
+    umbrella_header_name = provided_umbrella_header_file.basename
+    modulemap_file = file_support.intermediate(
+      ctx, "%s.modulemap" % bundle_name)
+    framework_support.create_modulemap(
+      ctx.actions, modulemap_file, bundle_name, umbrella_header_name,
+      [], [])
+    modulemap_contents_file = bundling_support.contents_file(
+      ctx, modulemap_file, "Modules/module.modulemap")      
 
   binary_artifact = binary_support.get_binary_provider(
       ctx.attr.deps, apple_common.AppleDylibBinary).binary
@@ -246,8 +260,8 @@ def _ios_framework_impl(ctx):
       "IosFrameworkArchive", "iOS framework",
       ctx.attr.bundle_id,
       binary_artifact=binary_artifact,
-      additional_bundlable_files=prefixed_hdr_files,
-      framework_files=prefixed_hdr_files + [bundlable_binary],
+      additional_bundlable_files=prefixed_hdr_files + [modulemap_contents_file] if modulemap_contents_file else prefixed_hdr_files,
+      framework_files=prefixed_hdr_files + [bundlable_binary] + [modulemap_contents_file] if modulemap_contents_file else prefixed_hdr_files + [bundlable_binary],
       is_dynamic_framework=True,
       deps_objc_providers=[deps_objc_provider],
       version_keys_required=False,
@@ -271,6 +285,7 @@ ios_framework = rule_factory.make_bundling_rule(
             providers=[[AppleBundleInfo, IosFrameworkBundleInfo]],
         ),
         "hdrs": attr.label_list(allow_files=[".h"]),
+        "umbrella_hdr": attr.label(allow_single_file=[".h"])
     },
     archive_extension=".zip",
     binary_providers=[apple_common.AppleDylibBinary],
